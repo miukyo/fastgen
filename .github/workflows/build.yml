@@ -1,0 +1,124 @@
+name: Multi-Platform Build
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build-native:
+    name: Build Native (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            output_dir: windows-x86_64
+            file_name: fastgen_native.dll
+            artifact_name: native-windows-x86_64
+
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            output_dir: linux-x86_64
+            file_name: libfastgen_native.so
+            artifact_name: native-linux-x86_64
+
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            output_dir: linux-aarch64
+            file_name: libfastgen_native.so
+            artifact_name: native-linux-aarch64
+            cross: true
+
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            output_dir: macos-aarch64
+            file_name: libfastgen_native.dylib
+            artifact_name: native-macos-aarch64
+
+          - os: macos-13
+            target: x86_64-apple-darwin
+            output_dir: macos-x86_64
+            file_name: libfastgen_native.dylib
+            artifact_name: native-macos-x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross (ARM64 Linux)
+        if: matrix.cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build Native Library (Native)
+        if: "!matrix.cross"
+        run: cargo build --release --target ${{ matrix.target }}
+        working-directory: crates/fastgen-native
+
+      - name: Build Native Library (Cross)
+        if: matrix.cross
+        run: cross build --release --target ${{ matrix.target }}
+        working-directory: crates/fastgen-native
+
+      - name: Stage Artifact
+        shell: bash
+        run: |
+          mkdir -p stage/${{ matrix.output_dir }}
+          cp crates/fastgen-native/target/${{ matrix.target }}/release/${{ matrix.file_name }} stage/${{ matrix.output_dir }}/
+
+      - name: Upload Native Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: stage/
+
+  package-jar:
+    name: Package Multi-Platform Jar
+    needs: build-native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Download all native artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: staged-natives
+
+      - name: Consolidate Native Libraries into Resources
+        shell: bash
+        run: |
+          mkdir -p src/main/resources/native
+          find staged-natives -type f \( -name "*.dll" -o -name "*.so" -o -name "*.dylib" \) -exec cp -r {} src/main/resources/native/ \;
+          # Also place into platform-specific directories:
+          for dir in staged-natives/*/*; do
+            if [ -d "$dir" ]; then
+              platform=$(basename "$dir")
+              mkdir -p src/main/resources/native/$platform
+              cp -r $dir/* src/main/resources/native/$platform/ 2>/dev/null || true
+            fi
+          done
+          ls -laR src/main/resources/native/
+
+      - name: Build Unified Jar with Maven
+        run: mvn package -DskipTests
+
+      - name: Upload FastGen Jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: FastGen-MultiPlatform-Jar
+          path: target/*.jar

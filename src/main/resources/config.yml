@@ -1,0 +1,17 @@
+# ==============================================================================
+# FastGen - High Performance Native World Generator (Panama + Rust)
+# ==============================================================================
+
+# Target Minecraft world generation rules and biomes:
+# - "auto": Automatically detects server release (Paper/Folia 26.1 or 26.2)
+# - "26.1": Minecraft 26.1 world generation (Pale Garden, 7,593 climate entries)
+# - "26.2": Minecraft 26.2 world generation (Sulfur Caves, 7,594 climate entries)
+worldgen-version: "auto"
+
+# Dedicated background prefetch worker threads:
+# NOTE: Paper already generates chunks multithreaded using chunk-system.worker-threads in paper-global.yml!
+# - "auto" or 0: Disables extra background threads. Paper's own worker threads generate
+#   chunks directly in Rust. This guarantees chunk generation CPU usage strictly adheres to
+#   worker-threads in paper-global.yml without saturating all CPU cores. (Recommended)
+# - 1 or more: Spawns this many additional background threads to precompute lookahead chunks.
+worker-threads: "auto"

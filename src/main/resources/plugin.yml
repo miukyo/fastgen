@@ -1,0 +1,8 @@
+name: FastGen
+version: '${project.version}'
+main: com.fastgen.FastGenPlugin
+api-version: '1.21'
+load: STARTUP
+folia-supported: true
+description: World generation powered by Rust native math and Project Panama
+author: fastgen
