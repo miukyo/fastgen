@@ -34,18 +34,6 @@ jobs:
             artifact_name: native-linux-aarch64
             cross: true
 
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            output_dir: macos-aarch64
-            file_name: libfastgen_native.dylib
-            artifact_name: native-macos-aarch64
-
-          - os: macos-13
-            target: x86_64-apple-darwin
-            output_dir: macos-x86_64
-            file_name: libfastgen_native.dylib
-            artifact_name: native-macos-x86_64
-
     steps:
       - uses: actions/checkout@v4
 
